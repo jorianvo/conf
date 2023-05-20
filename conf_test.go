@@ -7,9 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ardanlabs/conf/v3"
-	"github.com/ardanlabs/conf/v3/yaml"
 	"github.com/google/go-cmp/cmp"
+
+	"github.com/jorianvo/conf/v4"
+	"github.com/jorianvo/conf/v4/yaml"
 )
 
 const (
@@ -70,13 +71,13 @@ func TestRequired(t *testing.T) {
 	t.Logf("\tTest: %d\tWhen required values are missing.", 1)
 	{
 		f := func(t *testing.T) {
-			os.Args = []string{"conf.test"}
+			args := []string{""}
 			var cfg struct {
 				TestInt    int `conf:"required, default:1"`
 				TestString string
 				TestBool   bool
 			}
-			_, err := conf.Parse("TEST", &cfg)
+			_, err := conf.Parse(args, "TEST", &cfg)
 			if err == nil {
 				t.Fatalf("\t%s\tShould fail for missing required value.", failed)
 			}
@@ -88,13 +89,13 @@ func TestRequired(t *testing.T) {
 	t.Logf("\tTest: %d\tWhen struct has no fields.", 2)
 	{
 		f := func(t *testing.T) {
-			os.Args = []string{"conf.test"}
+			args := []string{""}
 			var cfg struct {
 				testInt    int `conf:"required, default:1"`
 				testString string
 				testBool   bool
 			}
-			_, err := conf.Parse("TEST", &cfg)
+			_, err := conf.Parse(args, "TEST", &cfg)
 			if err == nil {
 				t.Fatalf("\t%s\tShould fail for struct with no exported fields.", failed)
 			}
@@ -106,14 +107,14 @@ func TestRequired(t *testing.T) {
 	t.Logf("\tTest: %d\tWhen required values exist and are passed on args.", 3)
 	{
 		f := func(t *testing.T) {
-			os.Args = []string{"conf.test", "--test-int", "1"}
+			args := []string{"--test-int", "1"}
 
 			var cfg struct {
 				TestInt    int `conf:"required, default:1"`
 				TestString string
 				TestBool   bool
 			}
-			_, err := conf.Parse("TEST", &cfg)
+			_, err := conf.Parse(args, "TEST", &cfg)
 			if err != nil {
 				t.Fatalf("\t%s\tShould have parsed the required field on args : %s", failed, err)
 			}
@@ -125,7 +126,7 @@ func TestRequired(t *testing.T) {
 	t.Logf("\tTest: %d\tWhen required values exist and are passed on env.", 4)
 	{
 		f := func(t *testing.T) {
-			os.Args = []string{"conf.test"}
+			args := []string{""}
 			os.Setenv("TEST_TEST_INT", "1")
 
 			var cfg struct {
@@ -133,7 +134,7 @@ func TestRequired(t *testing.T) {
 				TestString string
 				TestBool   bool
 			}
-			_, err := conf.Parse("TEST", &cfg)
+			_, err := conf.Parse(args, "TEST", &cfg)
 			if err != nil {
 				t.Fatalf("\t%s\tShould have parsed the required field on Env : %s", failed, err)
 			}
@@ -165,13 +166,13 @@ func TestParse(t *testing.T) {
 		{
 			"flag",
 			nil,
-			[]string{"conf.test", "--an-int", "1", "-s", "s", "--bool", "--skip", "skip", "--ip-name", "local", "--debug-host", "http://bill:gopher@0.0.0.0:4000", "--password", "gopher", "--name", "andy", "--e-dur", "1m"},
+			[]string{"--an-int", "1", "-s", "s", "--bool", "--skip", "skip", "--ip-name", "local", "--debug-host", "http://bill:gopher@0.0.0.0:4000", "--password", "gopher", "--name", "andy", "--e-dur", "1m"},
 			config{1, "s", true, "", ip{"local", "127.0.0.0", []string{"127.0.0.1:200", "127.0.0.1:829"}}, "http://bill:gopher@0.0.0.0:4000", "gopher", CustomValue{something: "@hello@"}, Embed{"andy", time.Minute}},
 		},
 		{
 			"multi",
 			map[string]string{"TEST_A_STRING": "s", "TEST_BOOL": "TRUE", "TEST_IP_NAME_VAR": "local", "TEST_DEBUG_HOST": "http://bill:gopher@0.0.0.0:4000", "TEST_PASSWORD": "gopher", "TEST_NAME": "andy", "TEST_DURATION": "1m"},
-			[]string{"conf.test", "--an-int", "2", "--bool", "--skip", "skip", "--name", "jack", "-d", "1ms"},
+			[]string{"--an-int", "2", "--bool", "--skip", "skip", "--name", "jack", "-d", "1ms"},
 			config{2, "s", true, "", ip{"local", "127.0.0.0", []string{"127.0.0.1:200", "127.0.0.1:829"}}, "http://bill:gopher@0.0.0.0:4000", "gopher", CustomValue{something: "@hello@"}, Embed{"jack", time.Millisecond}},
 		},
 	}
@@ -187,10 +188,8 @@ func TestParse(t *testing.T) {
 				}
 
 				f := func(t *testing.T) {
-					os.Args = tt.args
-
 					var cfg config
-					if _, err := conf.Parse("TEST", &cfg); err != nil {
+					if _, err := conf.Parse(tt.args, "TEST", &cfg); err != nil {
 						t.Fatalf("\t%s\tShould be able to Parse arguments : %s.", failed, err)
 					}
 					t.Logf("\t%s\tShould be able to Parse arguments.", success)
@@ -233,10 +232,8 @@ func TestParseEmptyNamespace(t *testing.T) {
 				}
 
 				f := func(t *testing.T) {
-					os.Args = tt.args
-
 					var cfg config
-					if _, err := conf.Parse("", &cfg); err != nil {
+					if _, err := conf.Parse(tt.args, "", &cfg); err != nil {
 						t.Fatalf("\t%s\tShould be able to Parse arguments : %s.", failed, err)
 					}
 					t.Logf("\t%s\tShould be able to Parse arguments.", success)
@@ -266,10 +263,10 @@ func TestParse_Args(t *testing.T) {
 			Args: conf.Args{"migrate", "seed"},
 		}
 
-		os.Args = []string{"conf.test", "--port", "9000", "migrate", "seed"}
+		args := []string{"--port", "9000", "migrate", "seed"}
 
 		var cfg configArgs
-		if _, err := conf.Parse("TEST", &cfg); err != nil {
+		if _, err := conf.Parse(args, "TEST", &cfg); err != nil {
 			t.Fatalf("\t%s\tShould be able to Parse arguments : %s.", failed, err)
 		}
 		t.Logf("\t%s\tShould be able to Parse arguments.", success)
@@ -287,14 +284,14 @@ func TestErrors(t *testing.T) {
 		t.Logf("\tTest: %d\tWhen passing bad values to Parse.", 0)
 		{
 			f := func(t *testing.T) {
-				os.Args = []string{"conf.test"}
+				args := []string{""}
 
 				var cfg struct {
 					TestInt    int
 					TestString string
 					TestBool   bool
 				}
-				_, err := conf.Parse("TEST", cfg)
+				_, err := conf.Parse(args, "TEST", cfg)
 				if err == nil {
 					t.Fatalf("\t%s\tShould NOT be able to accept a value by value.", failed)
 				}
@@ -303,10 +300,10 @@ func TestErrors(t *testing.T) {
 			t.Run("not-by-ref", f)
 
 			f = func(t *testing.T) {
-				os.Args = []string{"conf.test"}
+				args := []string{""}
 
 				var cfg []string
-				_, err := conf.Parse("TEST", &cfg)
+				_, err := conf.Parse(args, "TEST", &cfg)
 				if err == nil {
 					t.Fatalf("\t%s\tShould NOT be able to pass anything but a struct value.", failed)
 				}
@@ -318,14 +315,14 @@ func TestErrors(t *testing.T) {
 		t.Logf("\tTest: %d\tWhen bad tags to Parse.", 1)
 		{
 			f := func(t *testing.T) {
-				os.Args = []string{"conf.test"}
+				args := []string{""}
 
 				var cfg struct {
 					TestInt    int `conf:"default:"`
 					TestString string
 					TestBool   bool
 				}
-				_, err := conf.Parse("TEST", &cfg)
+				_, err := conf.Parse(args, "TEST", &cfg)
 				if err == nil {
 					t.Fatalf("\t%s\tShould NOT be able to accept tag missing value.", failed)
 				}
@@ -334,14 +331,14 @@ func TestErrors(t *testing.T) {
 			t.Run("tag-missing-value", f)
 
 			f = func(t *testing.T) {
-				os.Args = []string{"conf.test"}
+				args := []string{""}
 
 				var cfg struct {
 					TestInt    int `conf:"short:ab"`
 					TestString string
 					TestBool   bool
 				}
-				_, err := conf.Parse("TEST", &cfg)
+				_, err := conf.Parse(args, "TEST", &cfg)
 				if err == nil {
 					t.Fatalf("\t%s\tShould NOT be able to accept invalid short tag.", failed)
 				}
@@ -435,10 +432,10 @@ func TestUsage(t *testing.T) {
 						os.Setenv(k, v)
 					}
 
-					os.Args = []string{"conf.test"}
+					args := []string{""}
 
 					var cfg config
-					if _, err := conf.Parse(tt.namespace, &cfg); err != nil {
+					if _, err := conf.Parse(args, tt.namespace, &cfg); err != nil {
 						fmt.Print(err)
 						return
 					}
@@ -503,10 +500,10 @@ func ExampleString() {
 		os.Setenv(k, v)
 	}
 
-	os.Args = []string{"conf.test"}
+	args := []string{""}
 
 	var cfg config
-	if _, err := conf.Parse("TEST", &cfg); err != nil {
+	if _, err := conf.Parse(args, "TEST", &cfg); err != nil {
 		fmt.Print(err)
 		return
 	}
@@ -564,7 +561,7 @@ func TestVersionExplicit(t *testing.T) {
 		},
 		{
 			name: "vershort",
-			args: []string{"conf.test", "-v"},
+			args: []string{"-v"},
 			config: ConfExplicit{
 				Version: conf.Version{
 					Build: "v1.0.0",
@@ -575,7 +572,7 @@ func TestVersionExplicit(t *testing.T) {
 		},
 		{
 			name: "verdes",
-			args: []string{"conf.test", "-version"},
+			args: []string{"-version"},
 			config: ConfExplicit{
 				Version: conf.Version{
 					Build: "v1.0.0",
@@ -587,7 +584,7 @@ func TestVersionExplicit(t *testing.T) {
 		},
 		{
 			name: "verdesshort",
-			args: []string{"conf.test", "-v"},
+			args: []string{"-v"},
 			config: ConfExplicit{
 				Version: conf.Version{
 					Build: "v1.0.0",
@@ -599,7 +596,7 @@ func TestVersionExplicit(t *testing.T) {
 		},
 		{
 			name: "desshort",
-			args: []string{"conf.test", "-v"},
+			args: []string{"-v"},
 			config: ConfExplicit{
 				Version: conf.Version{
 					Desc: "Service Description",
@@ -610,7 +607,7 @@ func TestVersionExplicit(t *testing.T) {
 		},
 		{
 			name:    "none",
-			args:    []string{"conf.test", "-v"},
+			args:    []string{"-v"},
 			config:  ConfExplicit{},
 			want:    "",
 			wantErr: false,
@@ -623,8 +620,7 @@ func TestVersionExplicit(t *testing.T) {
 			t.Logf("\tTest: %d\tWhen using an explicit struct.", i)
 			{
 				f := func(t *testing.T) {
-					os.Args = tt.args
-					if help, err := conf.Parse("APP", &tt.config); err != nil {
+					if help, err := conf.Parse(tt.args, "APP", &tt.config); err != nil {
 						if err == conf.ErrHelpWanted {
 							if diff := cmp.Diff(tt.want, help); diff != "" {
 								t.Errorf("\t%s\tShould match the output byte for byte. See diff:", failed)
@@ -651,7 +647,7 @@ func TestVersionImplicit(t *testing.T) {
 	}{
 		{
 			name: "only version",
-			args: []string{"conf.test", "--version"},
+			args: []string{"--version"},
 			config: ConfImplicit{
 				Version: conf.Version{
 					Build: "v1.0.0",
@@ -662,7 +658,7 @@ func TestVersionImplicit(t *testing.T) {
 		},
 		{
 			name: "only version shortcut",
-			args: []string{"conf.test", "-v"},
+			args: []string{"-v"},
 			config: ConfImplicit{
 				Version: conf.Version{
 					Build: "v1.0.0",
@@ -673,7 +669,7 @@ func TestVersionImplicit(t *testing.T) {
 		},
 		{
 			name: "version and description",
-			args: []string{"conf.test", "-version"},
+			args: []string{"-version"},
 			config: ConfImplicit{
 				Version: conf.Version{
 					Build: "v1.0.0",
@@ -685,7 +681,7 @@ func TestVersionImplicit(t *testing.T) {
 		},
 		{
 			name: "version and description shortcut",
-			args: []string{"conf.test", "-v"},
+			args: []string{"-v"},
 			config: ConfImplicit{
 				Version: conf.Version{
 					Build: "v1.0.0",
@@ -697,7 +693,7 @@ func TestVersionImplicit(t *testing.T) {
 		},
 		{
 			name: "only description shortcut",
-			args: []string{"conf.test", "-v"},
+			args: []string{"-v"},
 			config: ConfImplicit{
 				Version: conf.Version{
 					Desc: "Service Description",
@@ -708,7 +704,7 @@ func TestVersionImplicit(t *testing.T) {
 		},
 		{
 			name:    "no version",
-			args:    []string{"conf.test", "-v"},
+			args:    []string{"-v"},
 			config:  ConfImplicit{},
 			want:    "",
 			wantErr: false,
@@ -721,8 +717,8 @@ func TestVersionImplicit(t *testing.T) {
 			t.Logf("\tTest: %d\tWhen using an emplicit struct with.", i)
 			{
 				f := func(t *testing.T) {
-					os.Args = tt.args
-					if help, err := conf.Parse("APP", &tt.config); err != nil {
+					args := tt.args
+					if help, err := conf.Parse(args, "APP", &tt.config); err != nil {
 						if err == conf.ErrHelpWanted {
 							if diff := cmp.Diff(tt.want, help); diff != "" {
 								t.Errorf("\t%s\tShould match the output byte for byte. See diff:", failed)
@@ -776,7 +772,7 @@ func TestParseBoolFlag(t *testing.T) {
 	}{
 		{
 			name:  "long w/o equals",
-			osags: []string{"cmd", "--bool", "extra"},
+			osags: []string{"--bool", "extra"},
 			args: args{
 				cfg: &config{},
 			},
@@ -788,7 +784,7 @@ func TestParseBoolFlag(t *testing.T) {
 		},
 		{
 			name:  "short w/o equals",
-			osags: []string{"cmd", "-b", "extra"},
+			osags: []string{"-b", "extra"},
 			args: args{
 				cfg: &config{},
 			},
@@ -800,7 +796,7 @@ func TestParseBoolFlag(t *testing.T) {
 		},
 		{
 			name:  "long w/equals true",
-			osags: []string{"cmd", "--bool=true", "extra"},
+			osags: []string{"--bool=true", "extra"},
 			args: args{
 				cfg: &config{},
 			},
@@ -812,7 +808,7 @@ func TestParseBoolFlag(t *testing.T) {
 		},
 		{
 			name:  "short w/equals true",
-			osags: []string{"cmd", "-b=true", "extra"},
+			osags: []string{"-b=true", "extra"},
 			args: args{
 				cfg: &config{},
 			},
@@ -824,7 +820,7 @@ func TestParseBoolFlag(t *testing.T) {
 		},
 		{
 			name:  "long w/equals false",
-			osags: []string{"cmd", "--bool=false", "extra"},
+			osags: []string{"--bool=false", "extra"},
 			args: args{
 				cfg: &config{},
 			},
@@ -836,7 +832,7 @@ func TestParseBoolFlag(t *testing.T) {
 		},
 		{
 			name:  "short w/equals false",
-			osags: []string{"cmd", "-b=false", "extra"},
+			osags: []string{"-b=false", "extra"},
 			args: args{
 				cfg: &config{},
 			},
@@ -848,7 +844,7 @@ func TestParseBoolFlag(t *testing.T) {
 		},
 		{
 			name:  "just long flag",
-			osags: []string{"cmd", "--bool"},
+			osags: []string{"--bool"},
 			args: args{
 				cfg: &config{},
 			},
@@ -860,7 +856,7 @@ func TestParseBoolFlag(t *testing.T) {
 		},
 		{
 			name:  "just short flag",
-			osags: []string{"cmd", "-b"},
+			osags: []string{"-b"},
 			args: args{
 				cfg: &config{},
 			},
@@ -872,7 +868,7 @@ func TestParseBoolFlag(t *testing.T) {
 		},
 		{
 			name:  "just extra",
-			osags: []string{"cmd", "extra"},
+			osags: []string{"extra"},
 			args: args{
 				cfg: &config{},
 			},
@@ -884,7 +880,7 @@ func TestParseBoolFlag(t *testing.T) {
 		},
 		{
 			name:  "inner",
-			osags: []string{"cmd", "extra"},
+			osags: []string{"extra"},
 			args: args{
 				cfg: &config2{},
 			},
@@ -896,7 +892,7 @@ func TestParseBoolFlag(t *testing.T) {
 		},
 		{
 			name:  "embedded",
-			osags: []string{"cmd", "extra"},
+			osags: []string{"extra"},
 			args: args{
 				cfg: &config3{},
 			},
@@ -911,19 +907,12 @@ func TestParseBoolFlag(t *testing.T) {
 		tt := tt
 
 		t.Run(tt.name, func(t *testing.T) {
-			tmpArgs := os.Args
-			t.Cleanup(func() {
-				os.Args = tmpArgs
-			})
-
-			os.Args = tt.osags
-
 			prefix := tt.args.prefix
 			if prefix == "" {
 				prefix = "CONF_TEST_PARSE_BOOL_FLAG"
 			}
 
-			_, err := conf.Parse(prefix, tt.args.cfg, tt.args.parsers...)
+			_, err := conf.Parse(tt.osags, prefix, tt.args.cfg, tt.args.parsers...)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("parse bool flag with args: error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -981,7 +970,7 @@ func TestYAML(t *testing.T) {
 			"flag",
 			[]byte(yamlData),
 			nil,
-			[]string{"conf.test", "--a", "FlagEasy!"},
+			[]string{"--a", "FlagEasy!"},
 			yamlConfig{A: "FlagEasy!", B: internal{RenamedC: 2, D: []int{3, 4}}, E: "postgres"},
 		},
 	}
@@ -997,10 +986,8 @@ func TestYAML(t *testing.T) {
 				}
 
 				f := func(t *testing.T) {
-					os.Args = tt.args
-
 					var cfg yamlConfig
-					if _, err := conf.Parse("TEST", &cfg, yaml.WithData(tt.yaml)); err != nil {
+					if _, err := conf.Parse(tt.args, "TEST", &cfg, yaml.WithData(tt.yaml)); err != nil {
 						t.Fatalf("\t%s\tShould be able to Parse arguments : %s.", failed, err)
 					}
 					t.Logf("\t%s\tShould be able to Parse arguments.", success)

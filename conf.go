@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"os"
 	"reflect"
 	"strings"
 )
@@ -30,12 +29,7 @@ type Parsers interface {
 // apply the defaults first and then apply environment variables and
 // command line argument overrides to the struct. ErrHelpWanted is
 // returned when the --help or --version are detected.
-func Parse(prefix string, cfg interface{}, parsers ...Parsers) (string, error) {
-	var args []string
-	if len(os.Args) > 1 {
-		args = os.Args[1:]
-	}
-
+func Parse(args []string, prefix string, cfg interface{}, parsers ...Parsers) (string, error) {
 	for _, parser := range parsers {
 		if err := parser.Process(prefix, cfg); err != nil {
 			return "", fmt.Errorf("external parser: %w", err)
